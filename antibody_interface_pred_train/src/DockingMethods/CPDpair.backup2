@@ -1,0 +1,353 @@
+/*
+ * CPDpair.cpp
+ *
+ *  Created on: 25/feb/2015
+ *      Author: sebastian
+ */
+
+#include "CPDpair.h"
+#include <omp.h>
+
+/**
+ * Constructors
+ */
+CPDpair::CPDpair() :
+		cpd1(NULL), cpd2(NULL), score(0) {
+}
+CPDpair::CPDpair(CPDpair const & p) :
+		cpd1(p.cpd1), cpd2(p.cpd2), score(p.score) {
+}
+CPDpair::CPDpair(CompactPatchDescriptor const & cpd1, CompactPatchDescriptor const & cpd2) :
+		cpd1(&cpd1), cpd2(&cpd2) {
+	score = cpd1.surface_correlation(cpd2);
+}
+CPDpair::CPDpair(CompactPatchDescriptor const & cpd1, CompactPatchDescriptor const & cpd2, double alpha) :
+		cpd1(&cpd1), cpd2(&cpd2) {
+	score = alpha * cpd1.surface_correlation(cpd2)
+			+ (1 - alpha) * 0.5 * (cpd1.potentialsPN_correlation(cpd2) + cpd1.potentialsNP_correlation(cpd2));
+}
+
+/**
+ * Copy assignment operator
+ */
+CPDpair & CPDpair::operator=(CPDpair const & p) {
+	if (this != &p) {
+		this->cpd1 = p.cpd1;
+		this->cpd2 = p.cpd2;
+		this->score = p.score;
+	}
+	return *this;
+}
+ostream & operator<<(ostream &os, CPDpair const & p) {
+	os << "index 1: " << p.cpd1->ID << " index 2: " << p.cpd2->ID << " score: "
+			<< p.score << "\n";
+	return os;
+}
+/**
+ * This method creates a vector containing the num_pairs best matching CPDpairs. It
+ * analyzes all possible CompactPatchDescriptor matches between the two molecular
+ * surfaces and extracts the top num_pairs couples.
+ *
+ * @param compDesc1		input vector containing the CompactPatchDescriptors of the
+ * 						first molecular surface
+ * @param compDesc2		input vector containing the CompactPatchDescriptors of the
+ * 						second molecular surface
+ * @param num_pairs		maximum number of best matching pairs to return
+ * @param bestPairs		output vector which will contain the num_pairs best matching
+ * 						CPDpairs
+ */
+//void CPDpair::calculateBestCPDpairs_parallel(vector<CompactPatchDescriptor> const & descriptors_r,
+//		vector<CompactPatchDescriptor> const & descriptors_l, size_t num_pairs,
+//		vector<CPDpair> & bestPairs, double alpha) {
+//	size_t n1 = descriptors_r.size();
+//	size_t n2 = descriptors_l.size();
+//	size_t n = n1 * n2;
+//	assert(n > 0);
+//
+//	vector<vector<CPDpair>> localBestPairs;
+//	int n_threads = omp_get_max_threads();
+//	localBestPairs.resize(n_threads);
+//#pragma omp parallel
+//	{
+//	vector<CPDpair> lbp;
+//	lbp.reserve(num_pairs);
+//
+//	int id = omp_get_thread_num();
+//
+//	double minScore = min_double;
+//	if (!lbp.empty())
+//		minScore = lbp.back().score;
+//
+//	#pragma omp for nowait schedule(static)
+//	for (size_t k = 0; k < n; ++k) {
+//
+//		size_t i = k / n2;
+//		size_t j = k % n2;
+//
+//		if (descriptors_r[i].type * descriptors_l[j].type >= 0) {
+//			continue;
+//		}
+//
+//		CPDpair currentPair(descriptors_r[i], descriptors_l[j],	alpha);
+//		if (lbp.size() == num_pairs) {
+//			if (currentPair.score > minScore) {
+//				/**
+//				 * The current pair has a better score than the worst
+//				 * element in the list, so drop it.
+//				 */
+//				lbp.pop_back();
+//				size_t idx = binarySearch(lbp, currentPair);
+//				lbp.insert(lbp.begin() + idx,
+//						currentPair);
+//				/**
+//				 * Remember to update minScore, that must be the score of
+//				 * the last element in the list, as its elements are
+//				 * ordered in descending order.
+//				 */
+//				minScore = lbp.back().score;
+//			} else
+//				continue;
+//		}
+//		/**
+//		 * If there are less than num_pairs elements in bestPairs
+//		 * just push the current couple in the list. Remember to
+//		 * update the minScore and keep the list updated.
+//		 */
+//		else {
+//			/**
+//			 * If the currentPair has a worse score than the last element
+//			 * in the list, update the minScore and insert it at the
+//			 * back of the list.
+//			 */
+//			if (currentPair.score < minScore) {
+//				minScore = currentPair.score;
+//				lbp.push_back(currentPair);
+//			}
+//			/**
+//			 * If the currentPair's score is better than minScore, find
+//			 * the correct position to insert it in order to keep the
+//			 * list ordered.
+//			 */
+//			else {
+//				size_t idx = binarySearch(lbp, currentPair);
+//				lbp.insert(lbp.begin() + idx, currentPair);
+//			}
+//		}
+//	}
+//	localBestPairs[id] = lbp;
+//	}
+//
+//	bestPairs.reserve(2 * num_pairs);
+//	for (auto & l : localBestPairs) {
+//		size_t idx = bestPairs.size();
+//		bestPairs.insert(bestPairs.end(), l.begin(), l.end());
+//		inplace_merge(bestPairs.begin(), bestPairs.begin() + idx, bestPairs.end());
+//		if (bestPairs.size() > num_pairs)
+//			bestPairs.resize(num_pairs);
+//	}
+//}
+
+
+//void CPDpair::calculateBestCPDpairs(vector<CompactPatchDescriptor> const & descriptors_r,
+//		vector<CompactPatchDescriptor> const & descriptors_l, size_t num_pairs,
+//		vector<CPDpair> & bestPairs, double alpha) {
+//	size_t n1 = descriptors_r.size();
+//	size_t n2 = descriptors_l.size();
+//	assert(n1 > 0 && n2 > 0);
+//	bestPairs.reserve(num_pairs);
+//
+//	double minScore = max_double;
+//	for (size_t i = 0; i < n1; ++i) {
+//		for(size_t j = 0; j < n2; ++j) {
+//			if (descriptors_r[i].type * descriptors_l[j].type >= 0) {
+//				continue;
+//
+//			}
+//			CPDpair currentPair(descriptors_r[i], descriptors_l[j], alpha);
+//			/** note that bestPairs.size() is never greater than num_pairs */
+//			if (bestPairs.size() == num_pairs) {
+//				if (currentPair.score > minScore) {
+//					/**
+//					 * The current pair has a better score than the worst
+//					 * element in the list, so drop it.
+//					 */
+//					bestPairs.pop_back();
+//					size_t idx = binarySearch(bestPairs, currentPair);
+//					bestPairs.insert(bestPairs.begin() + idx, currentPair);
+//					/**
+//					 * Remember to update minScore, that must be the score of
+//					 * the last element in the list, as its elements are
+//					 * ordered in descending order.
+//					 */
+//					minScore = bestPairs.back().score;
+//				} else
+//					continue;
+//			}
+//			/**
+//			 * If there are less than num_pairs elements in bestPairs
+//			 * just push the current couple in the list. Remember to
+//			 * update the minScore and keep the list updated.
+//			 */
+//			else {
+//				/**
+//				 * If the currentPair has a worse score than the last element
+//				 * in the list, update the minScore and insert it at the
+//				 * back of the list.
+//				 */
+//				if (currentPair.score < minScore) {
+//					minScore = currentPair.score;
+//					bestPairs.push_back(currentPair);
+//				}
+//				/**
+//				 * If the currentPair's score is better than minScore, find
+//				 * the correct position to insert it in order to keep the
+//				 * list ordered.
+//				 */
+//				else {
+//					size_t idx = binarySearch(bestPairs, currentPair);
+//					bestPairs.insert(bestPairs.begin() + idx, currentPair);
+//				}
+//			}
+//		}
+//	}
+//}
+void CPDpair::calculateBestCPDpairs(
+		vector<CompactPatchDescriptor> const & descriptors_r,
+		vector<CompactPatchDescriptor> const & descriptors_l, size_t num_pairs,
+		vector<CPDpair> & bestPairs, double alpha, double threshold) {
+
+	bestPairs.reserve(num_pairs);
+
+	for (auto const & r_dsc : descriptors_r) {
+		for(auto const & l_dsc : descriptors_l) {
+			if (r_dsc.type * l_dsc.type >= 0) {
+				continue;
+			}
+			CPDpair currentPair(r_dsc, l_dsc, alpha);
+
+			if(currentPair.score < threshold)
+				continue;
+			/** note that bestPairs.size() is never greater than num_pairs */
+			if (bestPairs.size() == num_pairs) {
+				if (currentPair > bestPairs.back()) {
+					/**
+					 * The current pair has a better score than the worst
+					 * element in the list, so drop it.
+					 */
+					bestPairs.pop_back();
+					bestPairs.insert(upper_bound(bestPairs.begin(), bestPairs.end(),
+									currentPair, greater<CPDpair>()), currentPair);
+				} else
+					continue;
+			}
+			/**
+			 * If there are less than num_pairs elements in bestPairs
+			 * just insert the current couple in the list in the correct position.
+			 */
+			else {
+				bestPairs.insert(upper_bound(bestPairs.begin(), bestPairs.end(),
+								currentPair, greater<CPDpair>()), currentPair);
+			}
+		}
+	}
+}
+void CPDpair::calculateBestCPDpairs(
+		vector<CompactPatchDescriptor> const & descriptors_r,
+		vector<CompactPatchDescriptor> const & descriptors_l, size_t num_pairs,
+		vector<CPDpair> & bestPairs_old, vector<CPDpair> & bestPairs_new,
+		double alpha, double threshold) {
+
+	bestPairs_old.reserve(num_pairs);
+	bestPairs_new.reserve(num_pairs);
+
+	for (auto const & r_dsc : descriptors_r) {
+		for(auto const & l_dsc : descriptors_l) {
+			if (r_dsc.type * l_dsc.type >= 0) {
+				continue;
+			}
+			CPDpair currentPair_old(r_dsc, l_dsc);
+			CPDpair currentPair_new(r_dsc, l_dsc, alpha);
+			if(currentPair_old.score >= threshold) {
+			/// inserting the "old" pair
+			/** note that bestPairs.size() is never greater than num_pairs */
+			if (bestPairs_old.size() == num_pairs) {
+				if (currentPair_old > bestPairs_old.back()) {
+					/**
+					 * The current pair has a better score than the worst
+					 * element in the list, so drop it.
+					 */
+					bestPairs_old.pop_back();
+//					bestPairs_old.insert(upper_bound(bestPairs_old.begin(),
+//									bestPairs_old.end(), currentPair_old,
+//									greater<CPDpair>()), currentPair_old);
+					bestPairs_old.insert(bestPairs_old.begin()
+							+ binarySearch(bestPairs_old, currentPair_old), currentPair_old);
+				} //else
+				//	continue;
+			}
+			/**
+			 * If there are less than num_pairs elements in bestPairs
+			 * just insert the current couple in the list in the correct position.
+			 */
+			else {
+//				bestPairs_old.insert(upper_bound(bestPairs_old.begin(), bestPairs_old.end(),
+//								currentPair_old, greater<CPDpair>()), currentPair_old);
+				bestPairs_old.insert(bestPairs_old.begin()
+						+ binarySearch(bestPairs_old, currentPair_old), currentPair_old);
+			}
+			}
+			if(currentPair_new.score >= threshold) {
+
+
+			/// inserting the "new" pair
+			/** note that bestPairs.size() is never greater than num_pairs */
+			if (bestPairs_new.size() == num_pairs) {
+				if (currentPair_new > bestPairs_new.back()) {
+					/**
+					 * The current pair has a better score than the worst
+					 * element in the list, so drop it.
+					 */
+					bestPairs_new.pop_back();
+//					bestPairs_new.insert(upper_bound(bestPairs_new.begin(),
+//									bestPairs_new.end(), currentPair_new,
+//									greater<CPDpair>()), currentPair_new);
+					bestPairs_new.insert(bestPairs_new.begin()
+							+ binarySearch(bestPairs_new, currentPair_new), currentPair_new);
+				} //else
+					//continue;
+			}
+			/**
+			 * If there are less than num_pairs elements in bestPairs
+			 * just insert the current couple in the list in the correct position.
+			 */
+			else {
+				bestPairs_new.insert(bestPairs_new.begin()
+						+ binarySearch(bestPairs_new, currentPair_new), currentPair_new);
+			}
+		}
+		}
+	}
+}
+/**
+ * Simple method that generates a multimap that contains the best matching
+ * CPDpairs. Because a CompactPatchDescriptor of a surface patch on the first
+ * molecular surface can have good matches with more than a single CPD on the
+ * second molecular surface, we want an efficient way to get all the CPDs of
+ * the second molecular surface that have a good match with a given CPD on the
+ * first surface.
+ *
+ * @param bestPairs		input vector of the best matching CPDpairs
+ * @param bestPairsMap	output multimap that will contain the best matching
+ * 						CPDpairs
+ */
+void CPDpair::createBestCPDpairsMultimap(vector<CPDpair> const & bestPairs,
+		unordered_multimap<CompactPatchDescriptor const *, CompactPatchDescriptor const *> & bestPairsMap) {
+	size_t n = bestPairs.size();
+	assert(n > 0);
+	if (!bestPairsMap.empty())
+		bestPairsMap.clear();
+	bestPairsMap.reserve(n);
+	for(size_t i = 0; i < n; ++i) {
+		bestPairsMap.insert(make_pair(bestPairs[i].cpd1, bestPairs[i].cpd2));
+	}
+}
